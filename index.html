@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>懲罰轉盤</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      font-family: "Noto Sans TC", sans-serif;
+      color: #fff;
+      gap: 32px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 4px;
+      text-shadow: 0 0 12px rgba(255, 200, 0, 0.6);
+    }
+
+    .wheel-wrapper {
+      position: relative;
+      width: 420px;
+      height: 420px;
+    }
+
+    canvas#wheel {
+      border-radius: 50%;
+      box-shadow: 0 0 40px rgba(255, 200, 0, 0.4);
+    }
+
+    /* 指針 */
+    .pointer {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 40px solid #FFD700;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+    }
+
+    #spin-btn {
+      padding: 14px 48px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(255, 165, 0, 0.5);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    #spin-btn:active { transform: scale(0.96); }
+    #spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* 結果彈窗 */
+    #result-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    #result-overlay.show { display: flex; }
+
+    #result-box {
+      background: #16213e;
+      border: 2px solid #FFD700;
+      border-radius: 20px;
+      padding: 48px 56px;
+      text-align: center;
+      box-shadow: 0 0 40px rgba(255, 200, 0, 0.4);
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    #result-box .emoji { font-size: 3rem; margin-bottom: 12px; }
+    #result-box .title { font-size: 1rem; opacity: 0.7; margin-bottom: 8px; }
+    #result-box .punishment { font-size: 1.8rem; font-weight: bold; color: #FFD700; margin-bottom: 28px; }
+
+    #close-btn {
+      padding: 10px 36px;
+      font-size: 1rem;
+      background: #FFD700;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎡 懲罰轉盤</h1>
+
+  <div class="wheel-wrapper">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="420" height="420"></canvas>
+  </div>
+
+  <button id="spin-btn">旋 轉</button>
+
+  <div id="result-overlay">
+    <div id="result-box">
+      <div class="emoji">🎉</div>
+      <div class="title">你的懲罰是</div>
+      <div class="punishment" id="result-text"></div>
+      <button id="close-btn">確 認</button>
+    </div>
+  </div>
+
+  <script src="punishments.js"></script>
+  <script>
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const size = canvas.width;
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = cx - 8;
+
+    let currentAngle = 0;
+    let spinning = false;
+
+    function drawWheel(angle) {
+      const n = PUNISHMENTS.length;
+      const arc = (2 * Math.PI) / n;
+
+      ctx.clearRect(0, 0, size, size);
+
+      PUNISHMENTS.forEach((item, i) => {
+        const start = angle + i * arc;
+        const end = start + arc;
+
+        // 扇形
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, start, end);
+        ctx.closePath();
+        ctx.fillStyle = item.color;
+        ctx.fill();
+        ctx.strokeStyle = "#1a1a2e";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 文字
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(start + arc / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#fff";
+        ctx.font = `bold ${Math.min(16, 280 / n)}px 'Noto Sans TC', sans-serif`;
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 4;
+        ctx.fillText(item.label, radius - 12, 5);
+        ctx.restore();
+      });
+
+      // 中心圓
+      ctx.beginPath();
+      ctx.arc(cx, cy, 22, 0, 2 * Math.PI);
+      ctx.fillStyle = "#1a1a2e";
+      ctx.fill();
+      ctx.strokeStyle = "#FFD700";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    function spin() {
+      if (spinning) return;
+      spinning = true;
+      document.getElementById("spin-btn").disabled = true;
+
+      const extraSpins = (5 + Math.floor(Math.random() * 5)) * 2 * Math.PI;
+      const stopOffset = Math.random() * 2 * Math.PI;
+      const targetAngle = currentAngle + extraSpins + stopOffset;
+
+      const duration = 4000 + Math.random() * 1500;
+      const startTime = performance.now();
+      const startAngle = currentAngle;
+
+      function easeOut(t) {
+        return 1 - Math.pow(1 - t, 4);
+      }
+
+      function animate(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        currentAngle = startAngle + (targetAngle - startAngle) * easeOut(t);
+        drawWheel(currentAngle);
+
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          currentAngle = targetAngle % (2 * Math.PI);
+          spinning = false;
+          document.getElementById("spin-btn").disabled = false;
+          showResult();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function showResult() {
+      const n = PUNISHMENTS.length;
+      const arc = (2 * Math.PI) / n;
+      // 指針在正上方（-π/2），計算哪個扇形對應到那個位置
+      const normalized = ((2 * Math.PI - (currentAngle % (2 * Math.PI))) + (Math.PI / 2)) % (2 * Math.PI);
+      const index = Math.floor(normalized / arc) % n;
+
+      document.getElementById("result-text").textContent = PUNISHMENTS[index].label;
+      document.getElementById("result-overlay").classList.add("show");
+    }
+
+    document.getElementById("spin-btn").addEventListener("click", spin);
+    document.getElementById("close-btn").addEventListener("click", () => {
+      document.getElementById("result-overlay").classList.remove("show");
+    });
+
+    drawWheel(0);
+  </script>
+</body>
+</html>
