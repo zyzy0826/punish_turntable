@@ -106,6 +106,7 @@
       inset: -12px;
       border-radius: 50%;
       border: 2px solid var(--cyan);
+      pointer-events: none;
       box-shadow:
         0 0 12px var(--cyan),
         0 0 30px rgba(0,255,245,0.3),
@@ -129,6 +130,7 @@
       top: -28px;
       left: 50%;
       transform: translateX(-50%);
+      pointer-events: none;
       width: 0;
       height: 0;
       border-left: 14px solid transparent;
@@ -476,6 +478,9 @@
     }
 
     document.getElementById("spin-btn").addEventListener("click", spin);
+    const wheelWrapper = document.getElementById("wheel-wrapper");
+    wheelWrapper.addEventListener("click", spin);
+    wheelWrapper.style.cursor = "pointer";
     document.getElementById("close-btn").addEventListener("click", () => {
       document.getElementById("result-overlay").classList.remove("show");
     });
